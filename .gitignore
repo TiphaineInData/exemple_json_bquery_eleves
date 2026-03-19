@@ -1,0 +1,28 @@
+# Secrets & Credentials
+.env
+*.json
+cle_bigquery.json
+
+# Python
+my-env/
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

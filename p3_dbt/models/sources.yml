@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: api_source       # Le nom "alias" qu'on utilisera en SQL
+    database: projet-3-wild # Ton ID de projet GCP
+    schema: raw_data       # Le dataset où Python a mis les données
+    tables:
+      - name: raw_users    # Le nom de la table créée par Python
