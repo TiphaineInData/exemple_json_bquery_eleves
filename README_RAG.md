@@ -15,14 +15,32 @@ pip install google-cloud-bigquery anthropic
 
 ### 2. Configuration
 
+**Configurer ta clé Claude** :
+
 ```bash
 # Linux/Mac
-export ANTHROPIC_API_KEY="votre-clé-claude"
-export GOOGLE_APPLICATION_CREDENTIALS="./cle_bigquery.json"
+export ANTHROPIC_API_KEY="sk-ant-xxxxx"
 
 # Windows PowerShell
-$env:ANTHROPIC_API_KEY = "votre-clé-claude"
-$env:GOOGLE_APPLICATION_CREDENTIALS = "./cle_bigquery.json"
+$env:ANTHROPIC_API_KEY = "sk-ant-xxxxx"
+
+# Windows CMD
+set ANTHROPIC_API_KEY=sk-ant-xxxxx
+```
+
+**Ou via fichier `.env`** (à la racine du projet) :
+```
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+GOOGLE_APPLICATION_CREDENTIALS=./cle_bigquery.json
+```
+
+**Vérifier que c'est bon** :
+```powershell
+# PowerShell
+[Environment]::GetEnvironmentVariable('ANTHROPIC_API_KEY', 'User')
+
+# Ou directement en Python
+python -c "import os; print(os.environ.get('ANTHROPIC_API_KEY', 'NOT SET'))"
 ```
 
 ### 3. Utiliser l'interface interactive
@@ -31,16 +49,24 @@ $env:GOOGLE_APPLICATION_CREDENTIALS = "./cle_bigquery.json"
 python rag_search.py
 ```
 
-Exemple d'interaction :
+Le programme te pose des questions une par une :
+
 ```
-[PLAT] Quel type de plat cherches-tu?
+============================================================
+==== MOTEUR DE RECHERCHE DE RECETTES (RAG + Claude) ====
+============================================================
+
+[PLAT] Quel type de plat cherches-tu? (ex: 'un plat chaud et réconfortant')
 > un plat végétarien et sain
 
-[ALLERGIES] Allergies/ingrédients à éviter?
+[ALLERGIES] Allergies/ingrédients à ÉVITER? (ex: 'fromage, noix' ou 'aucun')
 > fromage, noix, arachides
 
-[RESULTATS] Combien de résultats? (défaut: 5)
+[RESULTATS] Combien de résultats? (par défaut: 5)
 > 3
+
+[CLAUDE] Extraction des ingrédients à éviter...
+[CLAUSE] ingredients NOT LIKE '%fromage%' AND ingredients NOT LIKE '%noix%' AND ingredients NOT LIKE '%arachides%'
 
 [RECHERCHE] Recherche en cours...
 
@@ -51,6 +77,9 @@ Exemple d'interaction :
 2. Soupe de Pois
    Distance: 0.8567
    Ingrédients: pois chiches, carottes, oignon, épices
+
+[SUITE] Veux-tu essayer une autre recherche? (oui/non)
+> non
 ```
 
 ---
@@ -58,12 +87,32 @@ Exemple d'interaction :
 ## 📚 Documentation
 
 - **[rag_bigquery.md](rag_bigquery.md)** : Guide complet BigQuery + Vertex AI (setup, SQL, VECTOR_SEARCH)
-- **[USAGE_CLAUDE.md](USAGE_CLAUDE.md)** : Guide d'utilisation avec Claude & allergies
 - **[rag_search.py](rag_search.py)** : Code source (classe RAGSearchEngine)
 
 ---
 
-## 🔧 Utilisation en Python directement
+## 🧠 Comment ça fonctionne avec Claude
+
+Quand tu rentres tes allergies, voici le flux :
+
+```
+1. Utilisateur tape : "fromage, noix, œufs"
+   ↓
+2. Claude extrait une WHERE clause SQL :
+   "ingredients NOT LIKE '%fromage%' AND ingredients NOT LIKE '%noix%' ..."
+   ↓
+3. BigQuery l'applique AVANT la recherche vectorielle
+   ↓
+4. VECTOR_SEARCH ne retourne QUE les recettes sans ces ingrédients
+   ↓
+5. Résultats affichés (filtrés + classés par similarité)
+```
+
+**Avantage** : Tu combines puissance AI (Claude) + filtrage intelligent (SQL) + recherche sémantique (BigQuery)
+
+---
+
+## 📖 Exemples d'utilisation
 
 ```python
 from rag_search import RAGSearchEngine
