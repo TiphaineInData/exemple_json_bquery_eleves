@@ -263,7 +263,10 @@ if __name__ == "__main__":
     # Décommenter pour créer le modèle (première fois seulement)
     # engine.setup_model(connection_id=CONNECTION_ID, region=REGION)
     
-    # Décommenter pour vectoriser la table (première fois seulement)
+    # IMPORTANTE: Vectoriser la table
+    # ⚠️  À faire UNE SEULE FOIS si ta table n'est PAS déjà vectorisée!
+    # Si ta table est déjà vectorisée en GCP, IGNORE cette étape et commente-la
+    # Sinon, décommente les lignes ci-dessous:
     # engine.vectorize_table(
     #     source_table=SOURCE_TABLE,
     #     text_columns=TEXT_COLUMNS
@@ -299,7 +302,16 @@ if __name__ == "__main__":
         where_clause = None
         if allergies_input and allergies_input.lower() != "aucun":
             print("\n[CLAUDE] Extraction des ingrédients à éviter...")
-            where_clause = engine.extract_allergies_with_claude(dish_description, allergies_input)
+            try:
+                where_clause = engine.extract_allergies_with_claude(dish_description, allergies_input)
+            except Exception as e:
+                print(f"\n[AVERTISSEMENT] Impossible d'utiliser Claude: {str(e)}")
+                print("[FALLBACK] On va utiliser les allergies manuellement...")
+                # Fallback: créer une WHERE clause simple manuellement
+                allergies_list = [a.strip() for a in allergies_input.split(',')]
+                where_parts = [f"ingredients NOT LIKE '%{a}%'" for a in allergies_list]
+                where_clause = " AND ".join(where_parts)
+                print(f"[CLAUSE] {where_clause}")
         
         # Lancer la recherche
         print("\n[RECHERCHE] En cours...\n")
