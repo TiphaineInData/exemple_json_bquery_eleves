@@ -7,6 +7,7 @@ Permet de faire des recherches vectorielles depuis Python
 from google.cloud import bigquery
 import os
 from typing import List, Dict, Optional
+import anthropic
 
 
 class RAGSearchEngine:
@@ -45,6 +46,46 @@ class RAGSearchEngine:
         self.dataset = dataset
         self.model_name = model_name
         self.vectorized_table = vectorized_table
+    
+    def extract_allergies_with_claude(self, dish_description: str, allergies: str) -> str:
+        """
+        Utiliser Claude pour extraire les ingrédients à éviter et générer une WHERE clause
+        
+        Args:
+            dish_description: Description du plat souhaité (ex: "un plat végétarien")
+            allergies: Allergies/ingrédients à éviter (ex: "fromage, noix, arachides")
+        
+        Returns:
+            WHERE clause prête pour la recherche (ex: "ingredients NOT LIKE '%fromage%' AND ...")
+        """
+        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        
+        prompt = f"""Tu es un expert culinaire. Ton rôle est d'extraire les ingrédients à éviter d'une liste d'allergies/préférences.
+
+Description du plat souhaité: {dish_description}
+Allergies/Ingrédients à éviter: {allergies}
+
+Génère une requête SQL WHERE clause pour filtre UNIQUEMENT les ingrédients à éviter. 
+Utilise le pattern: ingredients NOT LIKE '%ingredient%'
+Combine les conditions avec AND
+
+Retourne SEULEMENT la WHERE clause (sans le "WHERE" au début), pas d'explication.
+
+Exemple:
+Input: allergies = "fromage, noix"
+Output: ingredients NOT LIKE '%fromage%' AND ingredients NOT LIKE '%noix%'"""
+
+        message = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=200,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        
+        where_clause = message.content[0].text.strip()
+        print(f"[CLAUSE] {where_clause}")
+        return where_clause
     
     def setup_model(self, connection_id: str, region: str = "EU") -> None:
         """
@@ -141,7 +182,7 @@ class RAGSearchEngine:
         ORDER BY distance ASC;
         """
         
-        print(f"\n🔍 Recherche: '{query_text}'")
+        print(f"\n[RECHERCHE] Recherche: '{query_text}'")
         if where_clause:
             print(f"   Filtre: {where_clause}")
         print(f"   Top-{top_k} résultats\n")
@@ -180,17 +221,17 @@ class RAGSearchEngine:
                     print(f"   Ingrédients: {ingredients}")
                     print()
             else:
-                print("❌ Aucun résultat trouvé.")
+                print("[RESULTAT] Aucun résultat trouvé.")
             
             return rows
         
         except Exception as e:
-            print(f"❌ Erreur lors de la recherche: {e}")
+            print(f"[ERREUR] Erreur lors de la recherche: {e}")
             return []
 
 
 # ============================================================================
-# EXEMPLE D'UTILISATION
+# INTERFACE INTERACTIVE
 # ============================================================================
 
 if __name__ == "__main__":
@@ -229,31 +270,47 @@ if __name__ == "__main__":
     # )
     
     # ========================================================================
-    # RECHERCHES (à chaque fois qu'on veut chercher)
+    # INTERFACE INTERACTIVE
     # ========================================================================
     
-    # Recherche simple
-    results = engine.search(
-        query_text="un plat chaud et réconfortant, avec des légumes",
-        top_k=3
-    )
+    print("\n" + "="*60)
+    print("==== MOTEUR DE RECHERCHE DE RECETTES (RAG + Claude) ====")
+    print("="*60)
     
-    # Recherche avec filtre
-    results_filtered = engine.search(
-        query_text="un plat facile et rapide",
-        top_k=5,
-        where_clause="ingredients NOT LIKE '%produits_laitiers%'"
-    )
-    
-    # Accéder aux résultats en Python
-    print("\n=== Résultats Python ===")
-    if results:
-        first_result = results[0]
-        base_data = first_result.get('base', {})
-        if isinstance(base_data, dict):
-            titre = base_data.get('titre', 'N/A')
-        else:
-            titre = 'N/A'
-        distance = first_result.get('distance')
-        print(f"Meilleur résultat: {titre}")
-        print(f"Distance: {distance}")
+    while True:
+        print("\n")
+        
+        # Input 1: Description du plat souhaité
+        dish_description = input("[PLAT] Quel type de plat cherches-tu? (ex: 'un plat chaud et réconfortant')\n> ").strip()
+        if not dish_description:
+            print("[ERREUR] Entrée vide. Réessaye.")
+            continue
+        
+        # Input 2: Allergies et préférences
+        allergies_input = input("\n[ALLERGIES] Allergies/ingrédients à ÉVITER? (ex: 'fromage, noix' ou 'aucun')\n> ").strip()
+        
+        # Input 3: Nombre de résultats
+        try:
+            top_k = int(input("\n[RESULTATS] Combien de résultats? (par défaut: 5)\n> ").strip() or "5")
+        except ValueError:
+            top_k = 5
+        
+        # Utiliser Claude pour extraire les allergies si fourni
+        where_clause = None
+        if allergies_input and allergies_input.lower() != "aucun":
+            print("\n[CLAUDE] Extraction des ingrédients à éviter...")
+            where_clause = engine.extract_allergies_with_claude(dish_description, allergies_input)
+        
+        # Lancer la recherche
+        print("\n[RECHERCHE] En cours...\n")
+        results = engine.search(
+            query_text=dish_description,
+            top_k=top_k,
+            where_clause=where_clause
+        )
+        
+        # Option pour continuer
+        continue_choice = input("\n[SUITE] Veux-tu essayer une autre recherche? (oui/non)\n> ").strip().lower()
+        if continue_choice not in ["oui", "o", "yes", "y"]:
+            print("\n[FIN] À bientôt!")
+            break
