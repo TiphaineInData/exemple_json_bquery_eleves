@@ -75,7 +75,7 @@ p3_dbt:
       dataset: p3_analytics
       keyfile: ../cle_bigquery.json
       threads: 1
-      location: EU
+      location: US # mettre la location comme elle a été mise dans bigquery, je recommande US
       priority: interactive
 ```
 
